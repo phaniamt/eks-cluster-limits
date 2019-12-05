@@ -1,0 +1,45 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: test
+  region: eu-west-1
+  tags: {name: test}
+availabilityZones: ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+nodeGroups:
+####### test-Group########
+  - name: test-ng-1-14
+    labels:
+      nodegroup-type: test
+      server: test
+    instanceType: t3.small
+    minSize: 1
+    maxSize: 5
+    desiredCapacity: 1
+    availabilityZones: ["eu-west-1b"]
+    preBootstrapCommands:
+        # Replicate what --enable-docker-bridge does in /etc/eks/bootstrap.sh
+        # Enabling the docker bridge network. We have to disable live-restore as it
+        # prevents docker from recreating the default bridge network on restart
+       - "cp /etc/docker/daemon.json /etc/docker/daemon_backup.json"
+       - "echo -e '.bridge=\"docker0\" | .\"live-restore\"=false' >  /etc/docker/jq_script"
+       - "jq -f /etc/docker/jq_script /etc/docker/daemon_backup.json | tee /etc/docker/daemon.json"
+       - "systemctl restart docker"
+       - "sed -i '/--max-pods/d' /etc/systemd/system/kubelet.service.d/*.conf"
+       - "systemctl daemon-reload"
+       - "service kubelet restart"
+    ami: auto
+    volumeSize: 50
+    volumeType: gp2
+    ssh: # use existing EC2 key
+      publicKeyName: test
+    iam:
+      withAddonPolicies:
+        imageBuilder: true
+        autoScaler: true
+        externalDNS: true
+        certManager: true
+        appMesh: true
+        ebs: true
+        efs: true
+        albIngress: true
+        cloudWatch: true
